@@ -1123,7 +1123,7 @@ func (netw *Combined) refresh(cfg mesh.MachineMap) error {
 	if err = netw.defaultMeshBlock(cfg.Machine.Address); err != nil { //nolint:staticcheck
 		return fmt.Errorf("adding default block rule: %w", err)
 	}
-
+	log.Println("BUGDE: machine addr: " + cfg.Machine.Address.String())
 	if err = netw.allowIncoming(cfg.PublicKey, cfg.Machine.Address, true); err != nil { //nolint:staticcheck
 		return fmt.Errorf("allowing to reach self via meshnet: %w", err)
 	}
