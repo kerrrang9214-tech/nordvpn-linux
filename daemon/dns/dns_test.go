@@ -253,84 +253,105 @@ options edns0 trust-ad
 search home`)
 
 	tests := []struct {
-		name                      string
-		resolvconfFileContents    []byte
-		resolvconfLinkDestination string
-		setByResolvd              bool
-		setByResolvconf           bool
-		getLinkDestinationErr     error
-		resolvedSetErr            error
-		resolvedUnsetErr          error
-		resolvconfSetErr          error
-		resolvconfUnsetErr        error
-		expectedSetErr            error
-		expectedUnsetErr          error
-		readErr                   error
+		name                                 string
+		resolvconfFileContents               []byte
+		resolvconfLinkDestination            string
+		setByResolvd                         bool
+		setByResolvconf                      bool
+		expectedManagementServiceInAnalytics dnsManagementService
+		shouldEmitDNSConfiguredEvent         bool
+		getLinkDestinationErr                error
+		resolvedSetErr                       error
+		resolvedUnsetErr                     error
+		resolvconfSetErr                     error
+		resolvconfUnsetErr                   error
+		expectedSetErr                       error
+		expectedUnsetErr                     error
+		readErr                              error
 	}{
 		{
-			name:                   "resolv.conf is managed by resolved, resolved is used to set DNS",
-			resolvconfFileContents: resolvdResolvconf,
-			setByResolvd:           true,
+			name:                                 "resolv.conf is managed by resolved, resolved is used to set DNS",
+			resolvconfFileContents:               resolvdResolvconf,
+			setByResolvd:                         true,
+			expectedManagementServiceInAnalytics: systemdResolved,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 		{
-			name:                   "resolv.conf is not managed by resolved and resolved is not found, resolv.conf is used to set DNS",
-			resolvconfFileContents: noManagerResolvConf,
-			resolvedSetErr:         fmt.Errorf("resolvd not found"),
-			setByResolvconf:        true,
+			name:                                 "resolv.conf is not managed by resolved and resolved is not found, resolv.conf is used to set DNS",
+			resolvconfFileContents:               noManagerResolvConf,
+			resolvedSetErr:                       fmt.Errorf("resolvd not found"),
+			setByResolvconf:                      true,
+			expectedManagementServiceInAnalytics: unmanagedService,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 		{
-			name:                   "resolv.conf manager is unknown and resolv.conf is not a link, resolvd is not available, resolv.conf is used to set DNS",
-			resolvconfFileContents: unknownManager,
-			getLinkDestinationErr:  fmt.Errorf("failed to read link destination"),
-			resolvedSetErr:         fmt.Errorf("resolvd not found"),
-			setByResolvconf:        true,
+			name:                                 "resolv.conf manager is unknown and resolv.conf is not a link, resolvd is not available, resolv.conf is used to set DNS",
+			resolvconfFileContents:               unknownManager,
+			getLinkDestinationErr:                fmt.Errorf("failed to read link destination"),
+			resolvedSetErr:                       fmt.Errorf("resolvd not found"),
+			setByResolvconf:                      true,
+			expectedManagementServiceInAnalytics: unmanagedService,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 		{
-			name:                   "resolv.conf manager is unknown and resolv.conf is not a link, resolvd is available, resolvd is used to set DNS",
-			resolvconfFileContents: unknownManager,
-			getLinkDestinationErr:  fmt.Errorf("failed to read link destination"),
-			setByResolvd:           true,
+			name:                                 "resolv.conf manager is unknown and resolv.conf is not a link, resolvd is available, resolvd is used to set DNS",
+			resolvconfFileContents:               unknownManager,
+			getLinkDestinationErr:                fmt.Errorf("failed to read link destination"),
+			setByResolvd:                         true,
+			expectedManagementServiceInAnalytics: systemdResolved,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 		{
-			name:                      "manager is not recognized based on resolv.conf contents but the file links to resolved is used to set DNS",
-			resolvconfLinkDestination: resolvedLinkTarget,
-			resolvconfFileContents:    unknownManager,
-			setByResolvd:              true,
+			name:                                 "manager is not recognized based on resolv.conf contents but the file links to resolved is used to set DNS",
+			resolvconfLinkDestination:            resolvedLinkTarget,
+			resolvconfFileContents:               unknownManager,
+			setByResolvd:                         true,
+			expectedManagementServiceInAnalytics: systemdResolved,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 		{
-			name:                   "resolved is recognized from resolv.conf comment but setting the DNS fails, resolv.conf is used to set DNS",
-			resolvconfFileContents: resolvdResolvconf,
-			resolvedSetErr:         errSet,
-			setByResolvconf:        true,
+			name:                                 "resolved is recognized from resolv.conf comment but setting the DNS fails, resolv.conf is used to set DNS",
+			resolvconfFileContents:               resolvdResolvconf,
+			resolvedSetErr:                       errSet,
+			setByResolvconf:                      true,
+			expectedManagementServiceInAnalytics: systemdResolved,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 		{
-			name:                   "setting DNS with resolved and resolv.conf fails, a proper error is returned",
-			resolvconfFileContents: noManagerResolvConf,
-			resolvconfSetErr:       errSet,
-			resolvedSetErr:         errSet,
-			expectedSetErr:         errSet,
-			expectedUnsetErr:       ErrDNSNotSet,
+			name:                         "setting DNS with resolved and resolv.conf fails, a proper error is returned",
+			resolvconfFileContents:       noManagerResolvConf,
+			resolvconfSetErr:             errSet,
+			resolvedSetErr:               errSet,
+			expectedSetErr:               errSet,
+			shouldEmitDNSConfiguredEvent: false,
+			expectedUnsetErr:             ErrDNSNotSet,
 		},
 		{
-			name:                   "unsetting fails with resolved, a proper error is returned",
-			resolvconfFileContents: resolvdResolvconf,
-			setByResolvd:           true,
-			resolvedUnsetErr:       errUnset,
-			expectedUnsetErr:       errUnset,
+			name:                                 "unsetting fails with resolved, a proper error is returned",
+			resolvconfFileContents:               resolvdResolvconf,
+			setByResolvd:                         true,
+			expectedManagementServiceInAnalytics: systemdResolved,
+			shouldEmitDNSConfiguredEvent:         true,
+			resolvedUnsetErr:                     errUnset,
+			expectedUnsetErr:                     errUnset,
 		},
 		{
-			name:                   "unsetting fails with resolv.conf, a proper error is returned",
-			resolvconfFileContents: noManagerResolvConf,
-			setByResolvconf:        true,
-			resolvedSetErr:         errSet,
-			resolvconfUnsetErr:     errUnset,
-			expectedUnsetErr:       errUnset,
+			name:                                 "unsetting fails with resolv.conf, a proper error is returned",
+			resolvconfFileContents:               noManagerResolvConf,
+			setByResolvconf:                      true,
+			resolvedSetErr:                       errSet,
+			expectedManagementServiceInAnalytics: unmanagedService,
+			shouldEmitDNSConfiguredEvent:         true,
+			resolvconfUnsetErr:                   errUnset,
+			expectedUnsetErr:                     errUnset,
 		},
 		{
-			name:                      "reading resolv.conf file fails, but the file links to resolvd, resolvd is used to set DNS",
-			resolvconfLinkDestination: resolvedLinkTarget,
-			readErr:                   fmt.Errorf("read failed"),
-			setByResolvd:              true,
+			name:                                 "reading resolv.conf file fails, but the file links to resolvd, resolvd is used to set DNS",
+			resolvconfLinkDestination:            resolvedLinkTarget,
+			readErr:                              fmt.Errorf("read failed"),
+			setByResolvd:                         true,
+			expectedManagementServiceInAnalytics: systemdResolved,
+			shouldEmitDNSConfiguredEvent:         true,
 		},
 	}
 
@@ -351,10 +372,13 @@ search home`)
 			fs.linkDestination = test.resolvconfLinkDestination
 			fs.AddFile(resolvconfFilePath, test.resolvconfFileContents)
 
+			analyticsMock := analyticsMock{}
+
 			s := DNSServiceSetter{
 				systemdResolvedSetter: &resolvedSetter,
 				resolvconfSetter:      &resolvconfSetter,
 				resolvConfMonitor:     &mockResolvConfMonitor{},
+				analytics:             &analyticsMock,
 				filesystemHandle:      fs,
 			}
 
@@ -369,6 +393,14 @@ search home`)
 			if test.setByResolvconf {
 				assert.True(t, resolvconfSetter.isSet, "DNS was not configured by the expected setter(resolvconf).")
 				assert.False(t, resolvedSetter.isSet, "DNS was configured by the unexpected setter(resolvd)")
+			}
+
+			if test.shouldEmitDNSConfiguredEvent {
+				assert.True(t, analyticsMock.dnsConfiguredEmited,
+					"DNSConfigured event was not emited upon DNS configuration.")
+			} else {
+				assert.False(t, analyticsMock.dnsConfiguredEmited,
+					"DNSConfigured event was emitted when DNS configuration failed.")
 			}
 
 			err = s.Unset("eth0")

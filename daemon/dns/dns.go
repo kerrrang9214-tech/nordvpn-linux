@@ -91,6 +91,8 @@ func (d *DNSServiceSetter) set(setter Setter, iface string, nameservers []string
 	}
 
 	d.unsetter = setter
+	d.analytics.emitDNSConfiguredEvent()
+
 	return nil
 }
 
@@ -105,6 +107,7 @@ func (d *DNSServiceSetter) setBasedOnComment(iface string, nameservers []string)
 	if strings.Contains(string(resolvConfFileContentsStr), resolvdComment) {
 		log.Println(internal.InfoPrefix, dnsPrefix,
 			"configuring DNS with systemd-resolved, infered from resolv.conf comment")
+		d.analytics.setManagementService(systemdResolved)
 		if err := d.set(d.systemdResolvedSetter, iface, nameservers); err != nil {
 			return fmt.Errorf("setting DNS based on resolv.conf comment: %w", err)
 		}
@@ -125,6 +128,7 @@ func (d *DNSServiceSetter) setBasedOnResolvConfLinkTarget(iface string, nameserv
 
 	if strings.Contains(resolvConfLinkDestination, resolvedLinkTarget) {
 		log.Println(internal.InfoPrefix, dnsPrefix, "configuring DNS with systemd-resolved, infered from link target")
+		d.analytics.setManagementService(systemdResolved)
 		if err := d.set(d.systemdResolvedSetter, iface, nameservers); err != nil {
 			return fmt.Errorf("setting DNS based on resolv.conf link target: %w", err)
 		}
@@ -141,6 +145,7 @@ func (d *DNSServiceSetter) setBasedOnResolvConfLinkTarget(iface string, nameserv
 //  3. resolvconf utility
 //  4. direct write to resovl.conf
 func (d *DNSServiceSetter) setUsingBestAvailable(iface string, nameservers []string) error {
+	d.analytics.setManagementService(systemdResolved)
 	if err := d.set(d.systemdResolvedSetter, iface, nameservers); err != nil {
 		log.Println(internal.ErrorPrefix, dnsPrefix,
 			"failed to configure DNS using systemd-resolvd, attempting with resolv.conf")
@@ -149,6 +154,7 @@ func (d *DNSServiceSetter) setUsingBestAvailable(iface string, nameservers []str
 		return nil
 	}
 
+	d.analytics.setManagementService(unmanagedService)
 	if err := d.set(d.resolvconfSetter, iface, nameservers); err != nil {
 		return fmt.Errorf("failed to configure DNS with resolv.conf: %w", err)
 	}
