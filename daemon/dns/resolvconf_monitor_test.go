@@ -10,10 +10,16 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+type mockErrorEvent struct {
+	errorType errorType
+	critical  bool
+}
+
 type analyticsMock struct {
 	resolvConfEventEmitted bool
 	dnsConfiguredEmited    bool
 	managementService      dnsManagementService
+	emittedErrors          []mockErrorEvent
 }
 
 func (a *analyticsMock) setManagementService(managementService dnsManagementService) {
@@ -26,6 +32,10 @@ func (a *analyticsMock) emitResolvConfOverwrittenEvent() {
 
 func (a *analyticsMock) emitDNSConfiguredEvent() {
 	a.dnsConfiguredEmited = true
+}
+
+func (a *analyticsMock) emitDNSConfigurationErrorEvent(errorType errorType, critical bool) {
+	a.emittedErrors = append(a.emittedErrors, mockErrorEvent{errorType: errorType, critical: critical})
 }
 
 func newAnalyticsMock() analyticsMock {
