@@ -5,12 +5,9 @@ package firewall
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/NordSecurity/nordvpn-linux/events"
-	"github.com/NordSecurity/nordvpn-linux/internal"
-	"golang.org/x/exp/slices"
 )
 
 // Firewall is responsible for correctly changing one firewall agent over another.
@@ -49,10 +46,6 @@ func NewFirewall(noop, working Agent, publisher events.Publisher[string], enable
 func (fw *Firewall) Add(rules []Rule) error {
 	fw.mu.Lock()
 	defer fw.mu.Unlock()
-	alreadyAddedRules, err := fw.current.GetActiveRules()
-	if err != nil {
-		log.Printf("%v, unable to get already active rules: %v", internal.WarningPrefix, err)
-	}
 	for _, rule := range rules {
 		fw.publisher.Publish(fmt.Sprintf("adding rule %s", rule.Name))
 		if rule.Name == "" {
@@ -67,14 +60,8 @@ func (fw *Firewall) Add(rules []Rule) error {
 			}
 			fw.publisher.Publish(fmt.Sprintf("replacing existing rule %s", rule.Name))
 		}
-		// dont add if already added
-		if !slices.Contains(alreadyAddedRules, rule.Name) &&
-			!slices.Contains(alreadyAddedRules, rule.SimplifiedName) {
-			if err := fw.current.Add(rule); err != nil {
-				return NewError(fmt.Errorf("adding %s: %w", rule.Name, err))
-			}
-		} else {
-			log.Printf("%s rule already exists: %v", internal.WarningPrefix, rule.Name)
+		if err := fw.current.Add(rule); err != nil {
+			return NewError(fmt.Errorf("adding %s: %w", rule.Name, err))
 		}
 
 		if err := fw.rules.Add(rule); err != nil {
