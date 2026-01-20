@@ -64,10 +64,19 @@ func ListPhysical() ([]net.Interface, error) {
 	}
 
 	var devices []net.Interface
+	interfacesList := mapset.NewSet[string]()
+
 	for _, iface := range interfaces {
 		if !ifaceListContains(vInterfaces, iface) {
 			devices = append(devices, iface)
+			interfacesList.Add(iface.Name)
 		}
+	}
+
+	// Add interfaces that have default route
+	defInterfaces := InterfacesWithDefaultRoute(interfacesList)
+	for _, iface := range defInterfaces {
+		devices = append(devices, iface)
 	}
 	return devices, nil
 }
@@ -133,23 +142,34 @@ func InterfacesAreEqual(a net.Interface, b net.Interface) bool {
 		a.Flags == b.Flags
 }
 
-func InterfacesWithDefaultRoute(ignoreSet mapset.Set[string]) mapset.Set[string] {
+func InterfacesWithDefaultRoute(ignoreSet mapset.Set[string]) map[string]net.Interface {
 	// get interface list from default routes
 	routeList, _ := netlink.RouteList(nil, netlink.FAMILY_V4)
-	interfacesList := mapset.NewSet[string]()
+	interfacesList := make(map[string]net.Interface)
 	for _, r := range routeList {
-		if r.Dst != nil {
+		if !isDefaultRoute(r) {
 			continue
 		}
-		if r.Gw == nil {
-			continue
-		}
-		if iface, err := net.InterfaceByIndex(r.LinkIndex); err == nil {
-			if !ignoreSet.Contains(iface.Name) {
-				interfacesList.Add(iface.Name)
+
+		if iface, err := net.InterfaceByIndex(r.LinkIndex); err == nil && iface != nil {
+			if ignoreSet == nil || !ignoreSet.Contains(iface.Name) {
+				interfacesList[iface.Name] = *iface
 			}
 		}
 	}
 
 	return interfacesList
+}
+
+func isDefaultRoute(r netlink.Route) bool {
+	if r.Dst == nil {
+		return true
+	}
+
+	ones, bits := r.Dst.Mask.Size()
+	if ones != 0 || bits != 32 { // must be /0
+		return false
+	}
+
+	return true
 }
