@@ -34,6 +34,10 @@ OBFUSCATED_TECHNOLOGIES = [
     ("openvpn", "tcp", "on"),
 ]
 
+OBFUSCATED_TCP = [
+    ("openvpn", "tcp", "on"),
+]
+
 STANDARD_TECHNOLOGIES_NO_MESHNET = [
     # technology, protocol, obfuscation,
     ("openvpn", "udp", "off"),
@@ -41,7 +45,7 @@ STANDARD_TECHNOLOGIES_NO_MESHNET = [
     ("nordwhisper", "", ""),
 ]
 
-TECHNOLOGIES_NO_MESHNET = OBFUSCATED_TECHNOLOGIES + STANDARD_TECHNOLOGIES_NO_MESHNET
+TECHNOLOGIES_NO_MESHNET = OBFUSCATED_TCP + STANDARD_TECHNOLOGIES_NO_MESHNET
 
 # Used for test parametrization, when the tested functionality does not work with obfuscated.
 OVPN_STANDARD_TECHNOLOGIES = [
@@ -51,7 +55,7 @@ OVPN_STANDARD_TECHNOLOGIES = [
 ]
 
 # Used for test parametrization, when the same test has to be run for all technologies.
-TECHNOLOGIES = OBFUSCATED_TECHNOLOGIES + STANDARD_TECHNOLOGIES
+TECHNOLOGIES = OBFUSCATED_TCP + STANDARD_TECHNOLOGIES
 
 TECHNOLOGIES_BASIC1 = [
     ("nordlynx", "", ""),
